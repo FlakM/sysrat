@@ -1,0 +1,11 @@
+#!/usr/bin/env bpftrace
+#ifndef BPFTRACE_HAVE_BTF
+#include <linux/sched.h>
+#endif
+
+tracepoint:syscalls:sys_enter_exec*
+{
+  $task = (struct task_struct *)curtask;
+  printf("%s,%d,%d,", strftime("%Y %b %d %H:%M:%S", nsecs/1000000000), pid, $task->real_parent->pid);
+  join(args.argv);
+}

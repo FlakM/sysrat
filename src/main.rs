@@ -24,7 +24,10 @@ fn main() -> color_eyre::Result<()> {
     let thread = std::thread::spawn(move || {
         // Spawn the dtrace command.
         // Redirect stderr to stdout so we can read both from the same stream.
+        #[cfg(target_os = "macos")]
         let child_expression = cmd!("bash", "-c", "dtrace -s ./execsnoop.d");
+        #[cfg(target_os = "linux")]
+        let child_expression = cmd!("bash", "-c", "bpftrace -q execsnoop.bpf");
 
         let reader = child_expression.reader().unwrap();
         let reader = BufReader::new(reader);
@@ -33,7 +36,13 @@ fn main() -> color_eyre::Result<()> {
         for line in reader.lines() {
             match line {
                 Ok(l) => {
-                    let process = parse_line(&l).unwrap();
+                    let process = match parse_line(&l) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            panic!("Error parsing line: [{}] \n {}", l, e);
+                            continue;
+                        }
+                    };
                     sender
                         .send(event::Event::App(event::AppEvent::NewProcess(process)))
                         .unwrap();
