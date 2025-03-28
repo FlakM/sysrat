@@ -7,6 +7,7 @@ use std::{
 use crate::{
     ProcessExecution,
     event::{AppEvent, Event, EventHandler},
+    process_service::ProcessService,
 };
 use ratatui::{
     DefaultTerminal,
@@ -17,6 +18,29 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 const ITEM_HEIGHT: usize = 1;
+
+#[derive(Debug)]
+pub struct LongestItenLens {
+    pub(crate) timestamp: u16,
+    pub(crate) username: u16,
+    pub(crate) pid: u16,
+    pub(crate) ppid: u16,
+    pub(crate) comm: u16,
+    pub(crate) args: u16,
+}
+
+impl Default for LongestItenLens {
+    fn default() -> Self {
+        Self {
+            timestamp: 18,
+            username: 10,
+            pid: 15,
+            ppid: 20,
+            comm: 15,
+            args: 20,
+        }
+    }
+}
 
 /// Application.
 #[derive(Debug)]
@@ -36,7 +60,11 @@ pub struct App {
     /// Scrollbar state.
     pub scroll_state: RefCell<ScrollbarState>,
 
-    pub longest_item_lens: (u16, u16, u16, u16), // order is (timestamp, pid, ppid, command)
+    pub longest_item_lens: LongestItenLens,
+
+    pub debug_message: String,
+
+    pub process_service: ProcessService,
 }
 
 const MAX_ITEMS_COUNT: usize = 50;
@@ -45,11 +73,13 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            longest_item_lens: (10, 4, 4, 20),
+            longest_item_lens: LongestItenLens::default(),
             processes: VecDeque::with_capacity(MAX_ITEMS_COUNT),
             events: EventHandler::new(),
             state: RefCell::new(TableState::default().with_selected(0)),
             scroll_state: RefCell::new(ScrollbarState::new(MAX_ITEMS_COUNT * ITEM_HEIGHT)),
+            debug_message: String::new(),
+            process_service: ProcessService::new(),
         }
     }
 }
@@ -78,6 +108,7 @@ impl App {
             },
             Event::App(app_event) => match app_event {
                 AppEvent::NewProcess(process) => self.add_process(process),
+                AppEvent::Print(msg) => self.print_msg(msg),
                 AppEvent::Quit => self.quit(),
             },
         }
@@ -95,6 +126,22 @@ impl App {
             KeyCode::Char('k') | KeyCode::Up => self.previous_row(),
             KeyCode::Char('l') | KeyCode::Right => self.next_column(),
             KeyCode::Char('h') | KeyCode::Left => self.previous_column(),
+
+            KeyCode::Enter => {
+                let selected = self.state.borrow().selected();
+                if let Some(i) = selected {
+                    let process = self.processes.get(i).unwrap();
+                    let pid = process.pid;
+                    let ppid = process.ppid;
+
+                    let process = self.process_service.get_process(pid as usize);
+                    let parent_process = self.process_service.get_process(ppid as usize);
+
+                    let msg = format!("pid: {:?}\n ppid: {:?}", process, parent_process);
+
+                    self.print_msg(msg);
+                }
+            }
             // Other handlers you could add here.
             _ => {}
         }
@@ -110,6 +157,10 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn print_msg(&mut self, msg: String) {
+        self.debug_message = msg;
     }
 
     pub fn add_process(&mut self, process: ProcessExecution) {
@@ -160,35 +211,41 @@ impl App {
     }
 }
 
-fn constraint_len_calculator(items: &VecDeque<ProcessExecution>) -> (u16, u16, u16, u16) {
+fn constraint_len_calculator(items: &VecDeque<ProcessExecution>) -> LongestItenLens {
     let timestamp_len = items
         .iter()
         .map(|d| UnicodeWidthStr::width(d.timestamp.to_string().as_str()))
         .max()
         .unwrap_or(0);
-    let pid_len = items
+    let pid_len = 6;
+
+    let ppid_len = 15;
+
+    let username_len = items
         .iter()
-        .map(|d| UnicodeWidthStr::width(d.pid.to_string().as_str()))
+        .map(|d| UnicodeWidthStr::width(d.username.as_deref().unwrap_or_default()))
+        .max()
+        .unwrap_or(1);
+
+    let comm = items
+        .iter()
+        .map(|d| UnicodeWidthStr::width(d.comm.as_str()))
         .max()
         .unwrap_or(0);
 
-    let ppid_len = items
+    let args = items
         .iter()
-        .map(|d| UnicodeWidthStr::width(d.ppid.to_string().as_str()))
+        .map(|d| UnicodeWidthStr::width(d.args.as_str()))
         .max()
         .unwrap_or(0);
 
-    let command_len = items
-        .iter()
-        .map(|d| UnicodeWidthStr::width(d.command.as_str()))
-        .max()
-        .unwrap_or(0);
+    LongestItenLens {
+        timestamp: timestamp_len as u16,
+        username: username_len as u16,
+        pid: pid_len as u16,
+        ppid: ppid_len as u16,
+        comm: comm as u16,
+        args: args as u16,
+    }
 
-    #[allow(clippy::cast_possible_truncation)]
-    (
-        timestamp_len as u16,
-        pid_len as u16,
-        ppid_len as u16,
-        command_len as u16,
-    )
 }

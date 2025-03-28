@@ -37,33 +37,28 @@
         devShells.default = pkgs.mkShell {
 
           nativeBuildInputs = with pkgs; [
-            zlib
             pkg-config
+            llvmPackages.clang
             cmake
-            rust-analyzer-unwrapped
-            protobuf
-            xmlsec.dev
+            bpf-linker
+            #rust-analyzer-unwrapped
           ];
           buildInputs = with pkgs; [
-            libxml2
-            libxslt
-            openssl
-            llvmPackages.libclang
-            libtool
-            xmlsec
-            zlib
-            rust-toolchain
+            llvmPackages.clang
+            #rust-toolchain
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv
           ];
 
           env = {
             RUST_SRC_PATH = "${rust-toolchain}/lib/rustlib/src/rust/library";
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           };
 
           packages = with pkgs; [
             delta
             git
+            bpftools
           ]; # Additional dev shell packages can be appended here.
         };
       }

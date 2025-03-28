@@ -6,6 +6,10 @@
 tracepoint:syscalls:sys_enter_exec*
 {
   $task = (struct task_struct *)curtask;
-  printf("%s,%d,%d,", strftime("%Y %b %d %H:%M:%S", nsecs/1000000000), pid, $task->real_parent->pid);
+  // time,uid,pid,ppid,comm,args 
+  printf("%s,%d,%d,%d,%s,",
+         strftime("%Y %b %d %H:%M:%S", nsecs/1000000000),
+         uid, pid, $task->real_parent->pid, comm);
+  
   join(args.argv);
 }

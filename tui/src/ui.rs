@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 
+use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Layout, Rect},
@@ -26,6 +27,21 @@ use crate::app::App;
 const INFO_TEXT: [&str; 1] =
     ["(Esc) quit | (↑) move up | (↓) move down | (←) move left | (→) move right"];
 
+const COLORS: [ratatui::prelude::Color; 12] = [
+    Color::Red,
+    Color::Green,
+    Color::Yellow,
+    Color::Blue,
+    Color::Magenta,
+    Color::Cyan,
+    Color::LightGreen,
+    Color::LightYellow,
+    Color::LightBlue,
+    Color::LightMagenta,
+    Color::LightCyan,
+    Color::LightRed,
+];
+
 impl App {
     fn render_table(&self, area: Rect, buf: &mut Buffer) {
         let header_style = Style::default();
@@ -33,7 +49,7 @@ impl App {
         let selected_col_style = Style::default();
         let selected_cell_style = Style::default().add_modifier(Modifier::REVERSED);
 
-        let header = ["#", "timestamp", "pid", "ppid", "Command"]
+        let header = ["#", "timestamp", "user", "pid", "ppid", "comm", "args"]
             .into_iter()
             .map(Cell::from)
             .collect::<Row>()
@@ -44,22 +60,34 @@ impl App {
                 .chain(data.ref_array().iter().cloned())
                 .collect::<Vec<_>>();
 
-            item.into_iter()
-                .map(|content| Cell::from(Text::from(format!("{content}\n"))))
+
+            item.into_iter().enumerate()
+                .map(|(i, content)| {
+                    let cell = Cell::from(Text::from(format!("{content}\n")));
+                    if i == 4 {
+                        let color = content.parse::<u32>().unwrap_or(0) % COLORS.len() as u32;
+                        cell.style(Style::default().fg(COLORS[color as usize]))
+                    } else {
+                        cell
+                    }
+                })
                 .collect::<Row>()
                 .style(Style::new())
                 .height(1)
+
         });
         let bar = " █ ";
         let t = Table::new(
             rows,
             [
                 // + 1 is for padding.
-                Constraint::Length(2),
-                Constraint::Length(self.longest_item_lens.0 + 1),
-                Constraint::Length(self.longest_item_lens.1 + 1),
-                Constraint::Length(self.longest_item_lens.2 + 1),
-                Constraint::Max(self.longest_item_lens.3),
+                Constraint::Length(2), // #
+                Constraint::Length(self.longest_item_lens.timestamp + 1),
+                Constraint::Length(self.longest_item_lens.username + 1),
+                Constraint::Length(self.longest_item_lens.pid + 1),
+                Constraint::Length(self.longest_item_lens.ppid + 1),
+                Constraint::Length(self.longest_item_lens.comm + 1),
+                Constraint::Max(self.longest_item_lens.args)
             ],
         )
         .header(header)
@@ -94,12 +122,13 @@ impl App {
     }
 
     fn render_footer(&self, area: Rect, buf: &mut Buffer) {
-        let info_footer = Paragraph::new(Text::from_iter(INFO_TEXT))
+        let text = format!("{}", self.debug_message);
+        let info_footer = Paragraph::new(Text::from(text))
             .style(Style::new())
             .centered()
             .block(
                 Block::bordered()
-                    .border_type(BorderType::Double)
+                    .border_type(BorderType::Plain)
                     .border_style(Style::new()),
             );
         Widget::render(info_footer, area, buf);
@@ -114,10 +143,8 @@ impl Widget for &App {
     // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
     // - https://github.com/ratatui/ratatui/tree/master/examples
     fn render(self, area: Rect, buf: &mut Buffer) {
-
         let vertical = &Layout::vertical([Constraint::Min(5), Constraint::Length(4)]);
         let horizontal = Layout::horizontal([Constraint::Fill(1), Constraint::Max(3)]);
-
 
         let rects = vertical.split(area);
 

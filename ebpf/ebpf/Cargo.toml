@@ -1,0 +1,19 @@
+[package]
+name = "ebpf-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ebpf-common = { path = "../common" }
+
+aya-ebpf = { workspace = true }
+aya-log-ebpf = { workspace = true }
+aya-ebpf-bindings = "0.1.1"
+
+[build-dependencies]
+which = { workspace = true }
+
+[[bin]]
+name = "ebpf-kernel"
+path = "src/main.rs"
+

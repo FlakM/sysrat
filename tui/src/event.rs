@@ -37,6 +37,10 @@ pub enum Event {
 pub enum AppEvent {
     /// Append new process to the table
     NewProcess(ProcessExecution),
+
+    /// Print the diagnostic information
+    Print(String),
+
     /// Quit the application.
     Quit,
 }

@@ -27,3 +27,16 @@ Copyright (c) FlakM <maciej.jan.flak@gmail.com>
 This project is licensed under the MIT license ([LICENSE] or <http://opensource.org/licenses/MIT>)
 
 [LICENSE]: ./LICENSE
+
+
+## TODO
+
+
+- [ ] remove the dependency on `bpftrace` and use aya-rs instead
+- [ ] add counting of the processes (if they are similar) to avoid spamming the output - there can be some kind of label incremented
+- [ ] calculate the size of the window rendered to gather the number of maximum processes to display. Maybe we can just show like 200?
+- [ ] add details for a parent process based on /proc data
+- [ ] add ability to filter by regex
+- [ ] add ability to filter by some data on kernel side using maps
+- [ ] refactor getting the processes code into seperate module
+- [ ] add the description what this project does and what it does not
