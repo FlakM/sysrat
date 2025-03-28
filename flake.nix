@@ -4,34 +4,15 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     nix-filter.url = "github:numtide/nix-filter";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { nixpkgs, flake-utils, rust-overlay, nix-filter, ... }:
+  outputs = { nixpkgs, flake-utils, nix-filter, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        rust-toolchain = ((pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override
-          {
-            extensions = [ "rust-src" ];
-          }
-        );
-        overlays = [
-          (import rust-overlay)
-          (final: prev: {
-            nix-filter = nix-filter.lib;
-            rust-toolchain = rust-toolchain;
-          })
-        ];
         pkgs = import nixpkgs {
-          inherit system overlays;
+          inherit system;
         };
-
       in
       {
         devShells.default = pkgs.mkShell {
@@ -45,13 +26,13 @@
           ];
           buildInputs = with pkgs; [
             llvmPackages.clang
+            rustup
             #rust-toolchain
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv
           ];
 
           env = {
-            RUST_SRC_PATH = "${rust-toolchain}/lib/rustlib/src/rust/library";
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           };
 
