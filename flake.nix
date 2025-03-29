@@ -3,13 +3,18 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    # from master
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     nix-filter.url = "github:numtide/nix-filter";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { nixpkgs, flake-utils, nix-filter, ... }:
+  outputs = { nixpkgs, nixpkgs-unstable, flake-utils, nix-filter, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
+        pkgs-old = import nixpkgs {
+          inherit system;
+        };
         pkgs = import nixpkgs {
           inherit system;
         };
@@ -19,13 +24,15 @@
 
           nativeBuildInputs = with pkgs; [
             pkg-config
-            llvmPackages.clang
+            clang
+            llvm_19
             cmake
-            bpf-linker
-            #rust-analyzer-unwrapped
+            elfutils
+            bpftools
+            #bpf-linker
           ];
           buildInputs = with pkgs; [
-            llvmPackages.clang
+            clang
             rustup
             #rust-toolchain
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
@@ -39,6 +46,8 @@
           packages = with pkgs; [
             delta
             git
+
+            #bpf-linker
             bpftools
           ]; # Additional dev shell packages can be appended here.
         };

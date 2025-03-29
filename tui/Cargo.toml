@@ -3,7 +3,7 @@ name = "sysrat"
 version = "0.1.0"
 authors = ["FlakM <maciej.jan.flak@gmail.com>"]
 license = "MIT"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 crossterm = "0.28.1"

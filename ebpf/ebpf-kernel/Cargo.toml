@@ -14,6 +14,6 @@ aya-ebpf-bindings = "0.1.1"
 which = { workspace = true }
 
 [[bin]]
-name = "ebpf-kernel"
+name = "ebpf-kernel-bpf"
 path = "src/main.rs"
 

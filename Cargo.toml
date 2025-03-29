@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "ebpf/common", "ebpf/userland", "ebpf/ebpf", "tui"]
+members = [ "ebpf/common", "ebpf/userland", "ebpf/ebpf-kernel", "tui"]
 
 default-members = [ "ebpf/common", "ebpf/userland", "tui"]
 

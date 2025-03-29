@@ -12,6 +12,8 @@ aya-log = { workspace = true }
 env_logger = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
+ctrlc = "3.4.5"
+tokio = { workspace = true, features = ["full"] }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -29,7 +31,12 @@ aya-build = { workspace = true }
 # Finally note that *any* usage of `artifact = ...` in *any* Cargo.toml in the workspace breaks
 # workflows with stable cargo; stable cargo outright refuses to load manifests that use unstable
 # features.
-ebpf-kernel = { path = "../ebpf" }
+ebpf-kernel = { path = "../ebpf-kernel" }
 
 [lib]
 path = "src/lib.rs"
+
+
+[[bin]]
+name = "userland"
+path = "src/main.rs"
