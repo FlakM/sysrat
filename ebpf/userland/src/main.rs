@@ -1,7 +1,11 @@
 use aya::programs::TracePoint;
+use ebpf_common::Event;
 use log::info;
 #[rustfmt::skip]
 use log::{debug, warn};
+
+use aya::maps::RingBuf;
+use std::convert::TryFrom;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,6 +38,15 @@ async fn main() -> anyhow::Result<()> {
     program.load()?;
     program.attach("syscalls", "sys_enter_execve")?;
 
+    let mut ring_buf = RingBuf::try_from(ebpf.map_mut("RINGBUF").unwrap()).unwrap();
+
+    // TODO: use async fd polling like here: https://github.com/zz85/profile-bee/blob/c311ffa6833ee408ee62cf75d23620480e0a97ee/profile-bee/bin/profile-bee.rs#L232-L260
+    loop {
+        if let Some(item) = ring_buf.next() {
+           let event: Event =  unsafe { *item.as_ptr().cast() };
+           info!("event: {}", event);
+        }
+    }
 
     // await Ctrl-C without tokio
     let (tx, rx) = std::sync::mpsc::channel();
@@ -43,7 +56,6 @@ async fn main() -> anyhow::Result<()> {
     info!("waiting for Ctrl-C");
 
     rx.recv().unwrap();
-
 
     Ok(())
 }
