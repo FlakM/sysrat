@@ -16,10 +16,10 @@ use aya_ebpf::{
         bpf_probe_read_user_str_bytes,
     },
     macros::{map, tracepoint},
-    maps::RingBuf,
+    maps::{PerCpuArray, RingBuf},
     programs::TracePointContext,
 };
-use ebpf_common::{Event, ARG_COUNT, ARG_SIZE};
+use ebpf_common::{Event, ARG_COUNT, ARG_SIZE, ENV_COUNT};
 
 #[repr(C)]
 pub struct SysEnterExecve {
@@ -36,7 +36,6 @@ pub struct SysEnterExecve {
     pub envp: *const *const u8,
 }
 
-
 #[tracepoint(name = "sys_enter_execve", category = "syscalls")]
 pub fn sys_enter_execve(ctx: TracePointContext) -> u32 {
     match try_enter_execve(ctx) {
@@ -45,9 +44,11 @@ pub fn sys_enter_execve(ctx: TracePointContext) -> u32 {
     }
 }
 
+#[map]
+pub static BUF: PerCpuArray<Event> = PerCpuArray::with_max_entries(1, 0);
+
 #[map(name = "RINGBUF")]
-static mut RINGBUF: RingBuf =
-    RingBuf::with_byte_size(256, 0);
+static mut RINGBUF: RingBuf = RingBuf::with_byte_size(256, 0);
 
 // Implemention based on the suspection from here: https://github.com/notashes/syspection/blob/e5756aec507c2a9097331393b534392412c63d9b/syspection-ebpf/src/main.rs#L70
 fn try_enter_execve(ctx: TracePointContext) -> Result<u32, i64> {
@@ -66,13 +67,13 @@ fn try_enter_execve(ctx: TracePointContext) -> Result<u32, i64> {
         Err(ret) => return Err(ret),
     };
 
-    // Prepare a buffer for the concatenated arguments.
-    let mut args = [[0u8; ARG_SIZE]; ARG_COUNT];
-
-    // offset of data.argv in SysEnterExecve
-
     // Read the tracepoint data into our SysEnterExecve struct.
     let data: SysEnterExecve = unsafe { ctx.read_at(0).map_err(|_| -1)? };
+
+    let event_ref = unsafe {
+        let ptr = BUF.get_ptr_mut(0).ok_or(0)?;
+        &mut *ptr
+    };
 
     let argv = data.argv;
     for i in 0..ARG_COUNT {
@@ -83,32 +84,43 @@ fn try_enter_execve(ctx: TracePointContext) -> Result<u32, i64> {
         }
 
         unsafe {
-            bpf_probe_read_user_str_bytes(arg_ptr, &mut args[i as usize]).unwrap_or_default()
+            bpf_probe_read_user_str_bytes(arg_ptr, &mut event_ref.args[i as usize])
+                .unwrap_or_default()
         };
     }
 
-    let event = Event {
-        timestamp,
-        uid,
-        gid,
-        pid,
-        ppid,
-        comm,
-        args,
-    };
+    let envp = data.envp;
+    for env in 0..ENV_COUNT {
+        let env_ptr = unsafe { bpf_probe_read_user(envp.offset(env as isize)) }?;
 
-    unsafe {
-        submit(event);
+        if env_ptr.is_null() {
+            break;
+        }
+
+        unsafe {
+            bpf_probe_read_user_str_bytes(env_ptr, &mut event_ref.envs[env as usize])
+                .unwrap_or_default()
+        };
     }
 
-    // Explicitly return here so that every code path terminates with this return.
+    event_ref.timestamp = timestamp;
+    event_ref.uid = uid;
+    event_ref.gid = gid;
+    event_ref.pid = pid;
+    event_ref.ppid = ppid;
+    event_ref.comm = comm;
+
+    unsafe {
+        submit(event_ref);
+    }
+
     Ok(0)
 }
 
 #[inline]
-unsafe fn submit(event: Event) {
+unsafe fn submit(event: &mut Event) {
     if let Some(mut buf) = RINGBUF.reserve::<Event>(0) {
-        buf.write(event);
+        buf.write(*event);
         buf.submit(0);
     }
 }
